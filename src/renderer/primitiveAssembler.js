@@ -85,6 +85,7 @@ export default (raster) => {
     };
     return {
         loadBuffer,
+        get buffer() { return buffer; },
         TRIANGLES: (offset, count, uniforms, shader) => {
             renderSerial++;
             const limit = offset + count;

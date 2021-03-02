@@ -1,9 +1,16 @@
 import { clipLine, clipTrangle } from "./clip";
+import { vec4 } from "gl-matrix";
 import {
     clamp,
     testFunctions,
     toColor32,
 } from "./utils";
+import {
+    blendFunctionsRGB,
+    blendFunctionsAlpha,
+    blendEquationsRGB,
+    blendEquationsAlpha,
+} from "./blend";
 import defaultFragShader from "./shaders/frag/default";
 
 const DEFAULT_CLEAR_COLOR = [0, 0, 0, 1];
@@ -65,18 +72,42 @@ const interpolateAttrs = (out, v0, v1, t, attrsNames) => {
 };
 
 export default (ctx) => {
+    // COLOR BUFFER
     let { width, height } = ctx.canvas;
-    let count = 0;
-    let cullFace = -1;
     let pixelData = null;
+    let colorBuffer = null;
     let colorBuffer32 = null;
     let isColorBufferLittleEndian = true;
+    // DEPTH BUFFER
     let depthBuffer = null;
-    const MAX_DEEP = 0xFFFF | 0; // max 16 bit integer
+    let depthFuncRef = testFunctions.less;
+    let depthFunc = "less";
+    let depthWriteEnabled = true;
+    const MAX_DEPTH = 0xFFFF | 0; // max 16 bit integer
+    // CLIP & CULLING
+    let cullFace = -1;
     let viewport = { x: 0, y: 0, width: 1, height: 1 };
+    // BLENDING
+    const blendColor = new Float32Array(4);
+    const blendSrc = new Float32Array(4);
+    const blendDst = new Float32Array(4);
+    let blendEnabled = false;
+    let blendSrcFunctionRGB = "one";
+    let blendDstFunctionRGB = "zero";
+    let blendSrcFunctionAlpha = "one";
+    let blendDstFunctionAlpha = "zero";
+    let blendEquationRGB = "add";
+    let blendEquationAlpha = "add";
+    let blendSrcFunctionRGBRef = blendFunctionsRGB[blendSrcFunctionRGB];
+    let blendDstFunctionRGBRef = blendFunctionsRGB[blendDstFunctionRGB];
+    let blendSrcFunctionAlphaRef = blendFunctionsAlpha[blendSrcFunctionAlpha];
+    let blendDstFunctionAlphaRef = blendFunctionsAlpha[blendDstFunctionAlpha];
+    let blendEquationRGBRef = blendEquationsRGB[blendEquationRGB];
+    let blendEquationAlphaRef = blendEquationsAlpha[blendEquationAlpha];
+    // PRIMITIVE PROCESSING
+    let count = 0;
     let fragShader = defaultFragShader;
     let uniforms = {};
-    let depthTestFn = testFunctions.less;
     let attrsNames = null;
     const vertex0 = { position: [0, 0, 0, 0], attrs: null };
     const vertex1 = { position: [0, 0, 0, 0], attrs: null };
@@ -92,28 +123,26 @@ export default (ctx) => {
             return;
         }
         pixelData = ctx.createImageData(width, height);
-        colorBuffer32 = new Uint32Array(pixelData.data.buffer);
+        colorBuffer = pixelData.data;
+        colorBuffer32 = new Uint32Array(colorBuffer.buffer);
         colorBuffer32[0] = 0x0F000000;
         isColorBufferLittleEndian = pixelData.data[0] !== 0x0F;
         colorBuffer32[0] = 0;
         depthBuffer = new Uint16Array(width * height);
-        depthBuffer.fill(MAX_DEEP);
+        depthBuffer.fill(MAX_DEPTH);
     };
     createBuffers();
 
     const toDeviceCoords = (out, coords) => {
+        const { x: vx, y: vy, width: vw, height: vh } = viewport;
         const { 0: x, 1: y, 2: z, 3: w = 1} = coords;
         const nx = ((x / w) * 0.5 + 0.5);
         const ny = ((y / w) * 0.5 + 0.5);
         const nz = ((z / w) * 0.5 + 0.5);
 
-        const vx = ((nx) * viewport.width + viewport.x) * width;
-        const vy = ((1 - ny) * viewport.height + viewport.y) * height;
-        const vz = nz * MAX_DEEP;
-
-        out[0] = vx | 0;
-        out[1] = vy | 0;
-        out[2] = vz | 0;
+        out[0] = ((nx * vw + vx) * width) | 0;
+        out[1] = (((1 - ny) * vh + vy) * height) | 0;
+        out[2] = (nz * MAX_DEPTH) | 0;
         out[3] = w;
     };
 
@@ -124,27 +153,50 @@ export default (ctx) => {
         const offset = x + y * width;
         return !(x < 0 || x >= width
             || y < 0 || y >= height
-            || z < 0 || z >= MAX_DEEP
-            || !depthTestFn(depthBuffer[offset], z));
+            || z < 0 || z >= MAX_DEPTH
+            || !depthFuncRef(depthBuffer[offset], z));
     };
 
-    const writePixel = (x, y, z, color) => {
-        if (!color) return;
+    const writePixel = (x, y, z, srcColor) => {
+        if (!srcColor) return;
 
         x = x | 0;
         y = y | 0;
         z = z | 0;
         const offset = x + y * width;
 
-        colorBuffer32[offset] = toColor32(
-            color[0],
-            color[1],
-            color[2],
-            color[3],
-            isColorBufferLittleEndian,
-        );
+        if (blendEnabled) {
+            const offset4 = offset * 4;
+            blendDst[0] = colorBuffer[offset4 + 0] / 255;
+            blendDst[1] = colorBuffer[offset4 + 1] / 255;
+            blendDst[2] = colorBuffer[offset4 + 2] / 255;
+            blendDst[3] = colorBuffer[offset4 + 3] / 255;
 
-        depthBuffer[offset] = z;
+            blendSrcFunctionRGBRef(blendSrc, srcColor, srcColor, blendDst, blendColor);
+            blendSrcFunctionAlphaRef(blendSrc, srcColor, srcColor, blendDst, blendColor);
+            blendDstFunctionRGBRef(blendDst, blendDst, srcColor, blendDst, blendColor);
+            blendDstFunctionAlphaRef(blendDst, blendDst, srcColor, blendDst, blendColor);
+            blendEquationRGBRef(blendDst, blendSrc, blendDst);
+            blendEquationAlphaRef(blendDst, blendSrc, blendDst);
+
+            colorBuffer[offset4 + 0] = blendDst[0] * 255;
+            colorBuffer[offset4 + 1] = blendDst[1] * 255;
+            colorBuffer[offset4 + 2] = blendDst[2] * 255;
+            colorBuffer[offset4 + 3] = blendDst[3] * 255;
+        } else {
+            colorBuffer32[offset] = toColor32(
+                srcColor[0],
+                srcColor[1],
+                srcColor[2],
+                srcColor[3],
+                isColorBufferLittleEndian,
+            );
+        }
+
+
+        if (depthWriteEnabled) {
+            depthBuffer[offset] = z;
+        }
     };
 
     const drawLine = (v0, v1) => {
@@ -275,10 +327,104 @@ export default (ctx) => {
         set fragShader(value) { fragShader = value; },
         get cullFace() { return cullFace; },
         set cullFace(value) { cullFace = Math.sign(value); },
+        get blendEnabled() { return blendEnabled; },
+        set blendEnabled(value) { blendEnabled = !!value; },
+        get depthWriteEnabled() { return depthWriteEnabled; },
+        set depthWriteEnabled(value) { depthWriteEnabled = !!value; },
+        get depthFunc() { return depthFunc; },
+        set depthFunc(value) {
+            if (value in testFunctions) {
+                depthFuncRef = testFunctions[value];
+                depthFunc = value;
+            } else {
+                console.warn(`invalid depthFunc value ${value}`);
+            }
+        },
+        get blendSrcFunctionRGB() { return blendSrcFunctionRGB; },
+        set blendSrcFunctionRGB(value) {
+            if (value in blendFunctionsRGB) {
+                blendSrcFunctionRGB = value;
+                blendSrcFunctionRGBRef = blendFunctionsRGB[value];
+            } else {
+                console.warn(`invalid blendSrcFunctionRGB value ${value}`);
+            }
+        },
+        set blendSrcFunctionRGBA(value) {
+            if (value in blendFunctionsRGB) {
+                blendSrcFunctionRGB = value;
+                blendSrcFunctionAlpha = value;
+                blendSrcFunctionRGBRef = blendFunctionsRGB[value];
+                blendSrcFunctionAlphaRef = blendFunctionsRGB[value];
+            } else {
+                console.warn(`invalid blendSrcFunctionRGBA value ${value}`);
+            }
+        },
+        get blendDstFunctionRGB() { return blendDstFunctionRGB; },
+        set blendDstFunctionRGB(value) {
+            if (value in blendFunctionsRGB) {
+                blendDstFunctionRGB = value;
+                blendDstFunctionRGBRef = blendFunctionsRGB[value];
+            } else {
+                console.warn(`invalid blendDstFunctionRGB value ${value}`);
+            }
+        },
+        set blendDstFunctionRGBA(value) {
+            if (value in blendFunctionsRGB) {
+                blendDstFunctionRGB = value;
+                blendDstFunctionAlpha = value;
+                blendDstFunctionRGBRef = blendFunctionsRGB[value];
+                blendDstFunctionAlphaRef = blendFunctionsRGB[value];
+            } else {
+                console.warn(`invalid blendDstFunctionRGBA value ${value}`);
+            }
+        },
+        get blendSrcFunctionAlpha() { return blendSrcFunctionAlpha; },
+        set blendSrcFunctionAlpha(value) {
+            if (value in blendFunctionsAlpha) {
+                blendSrcFunctionAlpha = value;
+                blendSrcFunctionAlphaRef = blendFunctionsAlpha[value];
+            } else {
+                console.warn(`invalid blendSrcFunctionAlpha value ${value}`);
+            }
+        },
+        get blendDstFunctionAlpha() { return blendDstFunctionAlpha; },
+        set blendDstFunctionAlpha(value) {
+            if (value in blendFunctionsAlpha) {
+                blendDstFunctionAlpha = value;
+                blendDstFunctionAlphaRef = blendFunctionsAlpha[value];
+            } else {
+                console.warn(`invalid blendDstFunctionAlpha value ${value}`);
+            }
+        },
+        get blendEquationRGB() { return blendEquationRGB; },
+        set blendEquationRGB(value) {
+            if (value in blendEquationsRGB) {
+                blendEquationRGB = value;
+                blendEquationRGBRef = blendEquationsRGB[value];
+            } else {
+                console.warn(`invalid blendEquationRGB value ${value}`);
+            }
+        },
+        get blendEquationAlpha() { return blendEquationAlpha; },
+        set blendEquationAlpha(value) {
+            if (value in blendEquationsAlpha) {
+                blendEquationAlpha = value;
+                blendEquationAlphaRef = blendEquationsAlpha[value];
+            } else {
+                console.warn(`invalid blendEquationAlpha value ${value}`);
+            }
+        },
+        get blendColor() { return blendColor; },
+        set blendColor(color) {
+            blendColor[0] = clamp(color[0], 0, 1);
+            blendColor[1] = clamp(color[1], 0, 1);
+            blendColor[2] = clamp(color[2], 0, 1);
+            blendColor[3] = clamp(color[3], 0, 1);
+        },
         clear(color = DEFAULT_CLEAR_COLOR, depth = 1) {
             ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
             colorBuffer32.fill(toColor32(color[0], color[1], color[2], color[3], isColorBufferLittleEndian));
-            depthBuffer.fill(clamp((depth * MAX_DEEP) | 0, 0, MAX_DEEP));
+            depthWriteEnabled && depthBuffer.fill(clamp((depth * MAX_DEPTH) | 0, 0, MAX_DEPTH));
             count = 0;
         },
         flush() {
@@ -295,7 +441,7 @@ export default (ctx) => {
             toDeviceCoords(vertex0.position, v0.position);
             toDeviceCoords(vertex1.position, v1.position);
 
-            currentAttrsName = Object.keys(v0);
+            attrsNames = Object.keys(v0);
             vertex0.attrs = v0;
             vertex1.attrs = v1;
             // pre-allocated attrs objects with the same structure as vertex-0

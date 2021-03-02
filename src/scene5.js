@@ -1,14 +1,10 @@
 import { mat4, vec3, vec4, quat } from "gl-matrix";
 import createRenderer from "./renderer";
 import vertexLitShader from "./renderer/shaders/vertex/vertexLit";
-import basicTextFrag from "./renderer/shaders/frag/baseTexture";
+import defaultFragShader from "./renderer/shaders/frag/default";
 import Mesh from "./Mesh";
 import { TO_RAD } from "./utils";
 import Transform, { Space } from "./engine/Transform";
-import { map256TextToColor } from "./palette256";
-import earthTexture from "./textures/earth";
-import moonTexture from "./textures/moon";
-import iceTexture from "./textures/ice";
 
 const createRendererWithLights = (ctx) => {
     let lights = [
@@ -75,53 +71,38 @@ export default function(canvas) {
     const earth = createObject3d({
         mesh: Mesh.createIcosphere(0.5, 2),
         vertexShader: vertexLitShader,
-        fragShader: basicTextFrag,
+        fragShader: defaultFragShader,
         uniforms: {
-            diffuse: [1, 1, 1, 1],
+            diffuse: [1, 0, 1, .5],
             specular: [1, 1, 1],
             shineness: 40,
             textScale: 1,
-            text1: {
-                width: earthTexture[0],
-                height: earthTexture[1],
-                data: map256TextToColor(earthTexture, 2),
-            },
         },
     });
 
     const moon = createObject3d({
         mesh: Mesh.createIcosphere(0.2, 2),
         vertexShader: vertexLitShader,
-        fragShader: basicTextFrag,
+        fragShader: defaultFragShader,
         uniforms: {
-            diffuse: [1, 1, 1, 1],
+            diffuse: [1, 1, 0, .25],
             specular: [1, 1, 1],
             emission: [0.2, 0.2, 0.2],
-            shineness: 1,
+            shineness: 10,
             textScale: 3,
-            text1: {
-                width: moonTexture[0],
-                height: moonTexture[1],
-                data: map256TextToColor(moonTexture, 2),
-            },
         },
     });
 
     const asteroid = createObject3d({
         mesh: Mesh.createIcosphere(0.1, 1),
         vertexShader: vertexLitShader,
-        fragShader: basicTextFrag,
+        fragShader: defaultFragShader,
         uniforms: {
-            diffuse: [0.4, 0.7, 0.8, 1],
+            diffuse: [0.4, 0.7, 0.8, 0.3],
             specular: [1, 1, 1],
             emission: [0.2, 0.35, 0.4],
             shineness: 50,
             textScale: 2,
-            text1: {
-                width: iceTexture[0],
-                height: iceTexture[1],
-                data: map256TextToColor(iceTexture, 2),
-            },
         },
     });
 
@@ -136,12 +117,28 @@ export default function(canvas) {
     const rotationInc2 = quat.fromEuler([0, 0, 0, 1], 0, -2, 0);
     const rotationInc3 = quat.fromEuler([0, 0, 0, 1], 0, -0.5, -0.5);
 
+    const objects = [earth, moon, asteroid];
+
     const lights = [
         { position: [0, 0.7, 1, 0], color: [1, 1, 1] },
     ];
     lights.forEach((ligth) => vec3.normalize(ligth.position, ligth.position));
 
-    // renderer.viewport = { x: 0.25, y: 0.25, width: 0.5, height: 0.25 };
+    renderer.blendEnabled = true;
+    renderer.blendSrcFunctionRGBA = "srcAlpha";
+    renderer.blendDstFunctionRGBA = "oneMinusSrcAlpha";
+    renderer.depthWriteEnabled = false;
+
+    const camPosition = [0, 0, 2.5];
+    const dsta = new Float32Array(4);
+    const dstb = new Float32Array(4);
+    const sorter = (a, b) => {
+        a.transform.getPosition(dsta);
+        b.transform.getPosition(dstb);
+
+        return vec3.sqrDist(camPosition, dstb) - vec3.sqrDist(camPosition, dsta);
+    };
+    const forEachRender = obj => obj.render(renderer);
 
     return {
         resize({ width, height }) {
@@ -154,14 +151,18 @@ export default function(canvas) {
         render({ time }) {
             renderer.clear();
     
-            mat4.lookAt(viewMatrix, [0, 0, 2.5], [0, 0, 0], [0, 1, 0]);
+            mat4.lookAt(viewMatrix, camPosition, [0, 0, 0], [0, 1, 0]);
             renderer.viewMatrix = viewMatrix;
             earth.transform.rotateByQuat(rotationInc1);
             moon.transform.rotateByQuat(rotationInc2, Space.local);
             asteroid.transform.rotateByQuat(rotationInc3, Space.local);
-            earth.render(renderer);
-            moon.render(renderer);
-            asteroid.render(renderer);
+
+            objects.sort(sorter);
+
+            renderer.cullFace = 1;
+            objects.forEach(forEachRender);
+            renderer.cullFace = -1;
+            objects.forEach(forEachRender);
 
             renderer.flush();
         },

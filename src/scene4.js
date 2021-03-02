@@ -1,12 +1,9 @@
 import { mat4, vec3, vec4 } from "gl-matrix";
 import createRenderer from "./renderer";
 import phongVertexShader from "./renderer/shaders/vertex/phong";
-import celVertexShader from "./renderer/shaders/vertex/vertexCel";
-import defaultVertexShader from "./renderer/shaders/vertex/default";
 import defaultFragShader from "./renderer/shaders/frag/default";
 import celFragShader from "./renderer/shaders/frag/cel";
 import Mesh from "./Mesh";
-import tigerObj from "./models/tiger.obj";
 import { TO_RAD } from "./utils";
 
 const outlineVertexShader = (out, attrs, uniforms) => {

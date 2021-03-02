@@ -1,8 +1,5 @@
 import Transform from "../Transform";
 
-const enabledFilter = ({ enabled }) => enabled;
-const disabledFilter = ({ enabled }) => !enabled;
-
 export default class GameObject {
     #transform = null;
     #nonInitializedBehaviours = [];
@@ -22,11 +19,12 @@ export default class GameObject {
             configurable: true, // allows transform to be deleted - internal use only
         });
 
+        // eslint-disable-next-line no-unused-expressions
         children?.forEach((child) => child.transform.parent = this.#transform);
 
-        this.#behaviours = behaviours?.map(({ data, constructor }) => {
+        this.#nonInitializedBehaviours = behaviours?.map(({ data, constructor }) => {
             const behaviour = new constructor(this);
-            Object.assign(behaviour, data);
+            return Object.assign(behaviour, data);
         });
     }
 

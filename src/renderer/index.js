@@ -39,15 +39,31 @@ export default (ctx) => {
         set projectionMatrix(value) { mat4.copy(projectionMatrix, value); },
         get cullFace() { return raster.cullFace; },
         set cullFace(value) { raster.cullFace = value; },
-        clear() {
-            raster.clear();
-        },
-        resize() {
-            raster.resize();
-        },
-        render(mesh) {    
-            const { indices, vertices, subMeshes } = mesh;
-
+        get depthFunc() { return raster.depthFunc; },
+        set depthFunc(value) { raster.depthFunc = value; },
+        get depthWriteEnabled() { return raster.depthWriteEnabled; },
+        set depthWriteEnabled(value) { raster.depthWriteEnabled = value; },
+        get blendEnabled() { return raster.blendEnabled; },
+        set blendEnabled(value) { raster.blendEnabled = !!value; },
+        get blendSrcFunctionRGB() { return raster.blendSrcFunctionRGB; },
+        set blendSrcFunctionRGB(value) { raster.blendSrcFunctionRGB = value; },
+        set blendSrcFunctionRGBA(value) { raster.blendSrcFunctionRGBA = value; },
+        get blendDstFunctionRGB() { return raster.blendDstFunctionRGB; },
+        set blendDstFunctionRGB(value) { raster.blendDstFunctionRGB = value; },
+        set blendDstFunctionRGBA(value) { raster.blendDstFunctionRGBA = value; },
+        get blendSrcFunctionAlpha() { return raster.blendSrcFunctionAlpha; },
+        set blendSrcFunctionAlpha(value) { raster.blendSrcFunctionAlpha = value; },
+        get blendDstFunctionAlpha() { return raster.blendDstFunctionAlpha; },
+        set blendDstFunctionAlpha(value) { raster.blendDstFunctionAlpha = value; },
+        get blendEquationRGB() { return raster.blendEquationRGB; },
+        set blendEquationRGB(value) { raster.blendEquationRGB = value; },
+        get blendEquationAlpha() { return raster.blendEquationAlpha; },
+        set blendEquationAlpha(value) { raster.blendEquationAlpha = value; },
+        get blendColor() { return raster.blendColor; },
+        set blendColor(color) { raster.blendColor = color; },
+        clear() { raster.clear(); },
+        resize() { raster.resize(); },
+        uploadUniforms() {
             mat4.mul(modelViewMatrix, viewMatrix, modelMatrix);
             mat3.fromMat4(normalMatrix, modelViewMatrix);
             mat3.invert(normalMatrix, normalMatrix);
@@ -66,25 +82,33 @@ export default (ctx) => {
                 ...uniforms,
             };
             raster.uniforms = combinedUniforms;
-
-            primitiveAssembler.loadBuffer(mesh);
-
+        },
+        loadBuffer(mesh) {
+            primitiveAssembler.loadBuffer(mesh);  
+        },
+        pass() {
+            const { indices, vertices, subMeshes } = primitiveAssembler.buffer;
             for(let subMesh of subMeshes) {
                 const {
                     elementsOffset = 0,
                     elementsCount = numberToDefault(indices?.length, vertices.length),
                     topology,
-                    vertexShader:currentVertexShader = vertexShader,
+                    vertexShader: currentVertexShader = vertexShader,
                 } = subMesh;
 
                 // eslint-disable-next-line no-unused-expressions
                 primitiveAssembler[topology]?.(
                     elementsOffset,
                     elementsCount,
-                    combinedUniforms,
+                    raster.uniforms,
                     currentVertexShader,
                 );
             }
+        },
+        render(mesh) {    
+            this.uploadUniforms();
+            this.loadBuffer(mesh);
+            this.pass();
         },
         flush() {
             return raster.flush();
