@@ -1,5 +1,4 @@
 import { clipLine, clipTrangle } from "./clip";
-import { vec4 } from "gl-matrix";
 import {
     clamp,
     testFunctions,

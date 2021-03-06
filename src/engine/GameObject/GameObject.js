@@ -34,7 +34,6 @@ export default class GameObject {
     get active() { return this.#active; }
 
     awake() {
-        if (!this.active) return;
         while (this.#nonInitializedBehaviours.length > 0) {
             const behaviour = this.#nonInitializedBehaviours.pop();
             behaviour.awake();
@@ -87,6 +86,9 @@ export default class GameObject {
         for (let behaviour of behaviours) {
             behaviour.onDestroy();
         }
+        // just in case circular reference garbage collection
+        // is not proper implemented in the host JS VM
+        delete this.#transform.gameObject;
     }
 
     addBehaviour(BehaviourType) {

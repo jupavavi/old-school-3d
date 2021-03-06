@@ -2,19 +2,25 @@ import Behaviour from "./Behaviour";
 
 export default class Renderer extends Behaviour {
     mesh = null;
-    uniforms = null;
+    material = null;
 
-    render(renderer) {
-        const {
-            mesh,
-            transform,
-            vertexShader,
-            fragShader,
-        } = this;
+    render(renderer, deferredRender = false) {
+        const { mesh, transform, material } = this;
+        const { passes, uniforms } = material;
         renderer.modelMatrix = transform.getLocalToWorldMatrix(renderer.modelMatrix);
         renderer.uniforms = uniforms;
-        renderer.vertexShader = vertexShader;
-        renderer.fragShader = fragShader;
-        renderer.render(mesh);
+        renderer.prepare();
+        renderer.loadBuffer(mesh);
+        const { length: passesCount } = passes;
+        for(let p = 0; p < passesCount; p += 1) {
+            const { vertexShader, fragShader, attrs, deferred } = passes[p];
+            if (deferred !== deferredRender) {
+                continue;
+            }
+            renderer.vertexShader = vertexShader;
+            renderer.fragShader = fragShader;
+            Object.assign(renderer, attrs);
+            renderer.pass();
+        }
     }
 }

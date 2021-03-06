@@ -1,5 +1,7 @@
 import GameObject from "./GameObject";
 
+const identity = $ => $;
+
 export default (() => {
     let debug = false;
     // object in scene
@@ -25,9 +27,6 @@ export default (() => {
             // deletes all descendants
             objectToDelete.transform.children.forEach((transform) => removeGameObject(transform.gameObject));
 
-            // just in case circular reference garbage collection
-            // is not proper implemented in the host JS VM
-            delete objectToDelete.transform.gameObject;
             objectToDelete.destroy();
             gameObjects = gameObjects.filter(g => g !== objectToDelete);
         }
@@ -59,7 +58,7 @@ export default (() => {
     const findByName = (name) => gameObjects.find(obj => obj.name === name);
     const findAllByTag = (tag) => gameObjects.filter(obj => obj.tags.includes(tag));
 
-    const processAll = () => {
+    const update = (filter = identity) => {
         // appends new game objects before update loop
         gameObjectsToAppend.forEach(addGameObject);
         gameObjectsToAppend = [];
@@ -68,21 +67,22 @@ export default (() => {
         gameObjectsToDestroy.forEach(removeGameObject);
         gameObjectsToDestroy = [];
 
-        gameObjects.forEach((gameObject) => {
-            if (!gameObject.active) return;
-            // start must always be call before update
-            gameObject.awake(); // awake uninitialized behaviours if any
-            gameObject.start(); // starts unstarted behaviours if any
-            gameObject.update();
-            gameObject.afterUpdate();
-            gameObject.fixedUpdate(); // TODO: should be called on a fixed loop
-            gameObject.afterFixedUpdate(); // TODO: should be called on a fixed loop
-        });
+        gameObjects
+            .filter(identity)
+            .forEach((gameObject) => {
+                gameObject.awake(); // awakes non-awaken behaviours if any
+                if (!gameObject.active) return;
+                gameObject.start(); // starts unstarted behaviours if any
+                gameObject.update();
+                gameObject.afterUpdate();
+                gameObject.fixedUpdate(); // TODO: should be called on a fixed loop
+                gameObject.afterFixedUpdate(); // TODO: should be called on a fixed loop
+            });
     };
 
     return {
         create,
-        processAll,
+        update,
         clearAll,
         destroy,
         find,

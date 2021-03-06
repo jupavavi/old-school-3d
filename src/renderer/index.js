@@ -63,7 +63,7 @@ export default (ctx) => {
         set blendColor(color) { raster.blendColor = color; },
         clear() { raster.clear(); },
         resize() { raster.resize(); },
-        uploadUniforms() {
+        prepare() {
             mat4.mul(modelViewMatrix, viewMatrix, modelMatrix);
             mat3.fromMat4(normalMatrix, modelViewMatrix);
             mat3.invert(normalMatrix, normalMatrix);
@@ -84,7 +84,7 @@ export default (ctx) => {
             raster.uniforms = combinedUniforms;
         },
         loadBuffer(mesh) {
-            primitiveAssembler.loadBuffer(mesh);  
+            primitiveAssembler.loadBuffer(mesh);
         },
         pass() {
             const { indices, vertices, subMeshes } = primitiveAssembler.buffer;
@@ -106,7 +106,7 @@ export default (ctx) => {
             }
         },
         render(mesh) {    
-            this.uploadUniforms();
+            this.prepare();
             this.loadBuffer(mesh);
             this.pass();
         },
