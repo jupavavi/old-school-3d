@@ -2,8 +2,8 @@ import { mat4, vec3 } from "gl-matrix";
 import createRenderer from "./renderer";
 import phongVertexShader from "./renderer/shaders/vertex/vertexLit";
 import phongFragShader from "./renderer/shaders/frag/baseTexture";
-import Mesh from "./Mesh";
-import { TO_RAD, getKnotPoint } from "./utils";
+import Mesh from "./engine/Mesh";
+import { TO_RAD, getKnotPoint } from "./engine/utils";
 import { map256TextToColor } from "./palette256";
 import WallTex from "./textures/wall";
 

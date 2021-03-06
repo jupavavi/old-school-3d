@@ -1,6 +1,7 @@
 import "./gameCanvas.css";
 
 const MAX_WIDTH = 256;
+const MAX_HEIGHT = 224;
 
 const debugDiv = `
     <span class="game-canvas-debug__text game-canvas-debug__fps"></span>
@@ -89,8 +90,15 @@ export default ({ element, gameConstructor, debugMode = false }) => {
         const pixelWidth = canvas.clientWidth /* * window.devicePixelRatio */;
         const pixelHeight = canvas.clientHeight /* * window.devicePixelRatio */;
         if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
-            canvas.width = MAX_WIDTH;
-            canvas.height = MAX_WIDTH * canvas.clientHeight / canvas.clientWidth;
+            if (pixelWidth > pixelHeight) {
+                canvas.width = MAX_WIDTH;
+                canvas.height = MAX_WIDTH * canvas.clientHeight / canvas.clientWidth;
+            } else {
+                canvas.width = MAX_HEIGHT * canvas.clientWidth / canvas.clientHeight;
+                canvas.height = MAX_HEIGHT;
+            }
+            // canvas.width = 0.5 * pixelWidth;
+            // canvas.height = 0.5 * pixelHeight;
 
             game.resize({ width: canvas.width, height: canvas.height });
         }

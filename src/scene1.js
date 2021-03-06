@@ -2,8 +2,8 @@ import { mat4, vec3 } from "gl-matrix";
 import createRenderer from "./renderer";
 import phongVertexShader from "./renderer/shaders/vertex/phong";
 import phongFragShader from "./renderer/shaders/frag/phong";
-import Mesh from "./Mesh";
-import { TO_RAD } from "./utils";
+import Mesh from "./engine/Mesh";
+import { TO_RAD } from "./engine/utils";
 
 export default function(canvas) {
     const ctx = canvas.getContext("2d");

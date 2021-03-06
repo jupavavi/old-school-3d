@@ -27,6 +27,7 @@ export default class Mesh {
             elementsCount: !Number.isNaN(indices?.length) ? indices.length : vertices.length,
             topology: 'TRIANGLES',
         }];
+        this.calculateBounds();
     }
 
     calculateNormals() {

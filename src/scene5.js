@@ -2,8 +2,8 @@ import { mat4, vec3, vec4, quat } from "gl-matrix";
 import createRenderer from "./renderer";
 import vertexLitShader from "./renderer/shaders/vertex/vertexLit";
 import defaultFragShader from "./renderer/shaders/frag/default";
-import Mesh from "./Mesh";
-import { TO_RAD } from "./utils";
+import Mesh from "./engine/Mesh";
+import { TO_RAD } from "./engine/utils";
 import Transform, { Space } from "./engine/Transform";
 
 const createRendererWithLights = (ctx) => {
@@ -68,12 +68,14 @@ export default function(canvas) {
     const projectionMatrix = mat4.create();
     const viewMatrix = mat4.create();
 
+    const sphere = Mesh.createIcosphere(0.5, 2);
+
     const earth = createObject3d({
-        mesh: Mesh.createIcosphere(0.5, 2),
+        mesh: sphere,
         vertexShader: vertexLitShader,
         fragShader: defaultFragShader,
         uniforms: {
-            diffuse: [1, 0, 1, .5],
+            diffuse: [1, 0, 0, .5],
             specular: [1, 1, 1],
             shineness: 40,
             textScale: 1,
@@ -81,11 +83,11 @@ export default function(canvas) {
     });
 
     const moon = createObject3d({
-        mesh: Mesh.createIcosphere(0.2, 2),
+        mesh: sphere,
         vertexShader: vertexLitShader,
         fragShader: defaultFragShader,
         uniforms: {
-            diffuse: [1, 1, 0, .25],
+            diffuse: [0, 1, 0, .25],
             specular: [1, 1, 1],
             emission: [0.2, 0.2, 0.2],
             shineness: 10,
@@ -94,11 +96,11 @@ export default function(canvas) {
     });
 
     const asteroid = createObject3d({
-        mesh: Mesh.createIcosphere(0.1, 1),
+        mesh: sphere,
         vertexShader: vertexLitShader,
         fragShader: defaultFragShader,
         uniforms: {
-            diffuse: [0.4, 0.7, 0.8, 0.3],
+            diffuse: [0, 0, 1, 0.3],
             specular: [1, 1, 1],
             emission: [0.2, 0.35, 0.4],
             shineness: 50,
@@ -108,10 +110,12 @@ export default function(canvas) {
 
     earth.transform.setPosition([0, 0, 0]);
     earth.transform.rotateByQuat(quat.fromEuler([0, 0, 0, 1], 0, 0, 23.5));
+    moon.transform.setLocalScale([0.4, 0.4, 0.4]);
     moon.transform.parent = earth.transform;
     moon.transform.setLocalPosition([1.25, 0, 0]);
+    asteroid.transform.setLocalScale([0.5, 0.5, 0.5]);
     asteroid.transform.parent = moon.transform;
-    asteroid.transform.setLocalPosition([0.5, 0, 0]);
+    asteroid.transform.setLocalPosition([1, 0, 0]);
 
     const rotationInc1 = quat.fromEuler([0, 0, 0, 1], 0, 0.5, 0);
     const rotationInc2 = quat.fromEuler([0, 0, 0, 1], 0, -2, 0);

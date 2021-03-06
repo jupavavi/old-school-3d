@@ -3,8 +3,8 @@ import createRenderer from "./renderer";
 import phongVertexShader from "./renderer/shaders/vertex/phong";
 import defaultFragShader from "./renderer/shaders/frag/default";
 import celFragShader from "./renderer/shaders/frag/cel";
-import Mesh from "./Mesh";
-import { TO_RAD } from "./utils";
+import Mesh from "./engine/Mesh";
+import { TO_RAD } from "./engine/utils";
 
 const outlineVertexShader = (out, attrs, uniforms) => {
     const { position, normal } = attrs;

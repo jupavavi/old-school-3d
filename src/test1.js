@@ -1,7 +1,7 @@
 import { mat4, vec3 } from "gl-matrix";
 import "./gameCanvas.css";
-import Mesh from "./Mesh";
-import { TO_RAD } from "./utils";
+import Mesh from "./engine/Mesh";
+import { TO_RAD } from "./engine/utils";
 import createRenderer from "./renderer";
 import checkersFragShader from "./renderer/shaders/frag/checkers";
 import defaultFragShader from "./renderer/shaders/frag/default";
