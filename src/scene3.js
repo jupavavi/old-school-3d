@@ -4,7 +4,7 @@ import vertexLitShader from "./renderer/shaders/vertex/vertexLit";
 import basicTextFrag from "./renderer/shaders/frag/baseTexture";
 import Mesh from "./engine/Mesh";
 import { TO_RAD } from "./engine/utils";
-import Transform, { Space } from "./engine/Transform";
+import Transform from "./engine/Transform";
 import { map256TextToColor } from "./palette256";
 import earthTexture from "./textures/earth";
 import moonTexture from "./textures/moon";
@@ -43,7 +43,7 @@ const createRendererWithLights = (ctx) => {
 };
 
 const createObject3d = ({
-    mesh,
+    meshBuffer,
     vertexShader,
     fragShader,
     uniforms,
@@ -54,12 +54,12 @@ const createObject3d = ({
         transform,
         uniforms,
         render(renderer) {
-            transform.getLocalToWorldMatrix(renderer.modelMatrix);
+            renderer.modelMatrix = transform.localToWorldMatrix;
             renderer.uniforms = uniforms;
             renderer.vertexShader = vertexShader;
             renderer.fragShader = fragShader;
 
-            renderer.render(mesh);
+            renderer.render(meshBuffer);
         },
     };
 };
@@ -71,9 +71,11 @@ export default function(canvas) {
     const renderer = createRendererWithLights(ctx);
     const projectionMatrix = mat4.create();
     const viewMatrix = mat4.create();
+    const sphere = Mesh.createIcosphere(0.5, 3);
+    const meshBuffer = sphere.createBuffer();
 
     const earth = createObject3d({
-        mesh: Mesh.createIcosphere(0.5, 2),
+        meshBuffer,
         vertexShader: vertexLitShader,
         fragShader: basicTextFrag,
         uniforms: {
@@ -90,7 +92,7 @@ export default function(canvas) {
     });
 
     const moon = createObject3d({
-        mesh: Mesh.createIcosphere(0.2, 2),
+        meshBuffer,
         vertexShader: vertexLitShader,
         fragShader: basicTextFrag,
         uniforms: {
@@ -108,7 +110,7 @@ export default function(canvas) {
     });
 
     const asteroid = createObject3d({
-        mesh: Mesh.createIcosphere(0.1, 1),
+        meshBuffer,
         vertexShader: vertexLitShader,
         fragShader: basicTextFrag,
         uniforms: {
@@ -125,12 +127,14 @@ export default function(canvas) {
         },
     });
 
-    earth.transform.setPosition([0, 0, 0]);
-    earth.transform.rotateByQuat(quat.fromEuler([0, 0, 0, 1], 0, 0, 23.5));
+    earth.transform.position = [0, 0, 0];
+    earth.transform.rotation = quat.fromEuler([0, 0, 0, 1], 0, 0, 23.5);
     moon.transform.parent = earth.transform;
-    moon.transform.setLocalPosition([1.25, 0, 0]);
+    moon.transform.localScale = [0.4, 0.4, 0.4];
+    moon.transform.localPosition = [1.25, 0, 0];
     asteroid.transform.parent = moon.transform;
-    asteroid.transform.setLocalPosition([0.5, 0, 0]);
+    asteroid.transform.localScale = [0.5, 0.5, 0.5];
+    asteroid.transform.localPosition = [1, 0, 0];
 
     const rotationInc1 = quat.fromEuler([0, 0, 0, 1], 0, 0.5, 0);
     const rotationInc2 = quat.fromEuler([0, 0, 0, 1], 0, -2, 0);
@@ -157,13 +161,13 @@ export default function(canvas) {
             mat4.lookAt(viewMatrix, [0, 0, 2.5], [0, 0, 0], [0, 1, 0]);
             renderer.viewMatrix = viewMatrix;
             earth.transform.rotateByQuat(rotationInc1);
-            moon.transform.rotateByQuat(rotationInc2, Space.local);
-            asteroid.transform.rotateByQuat(rotationInc3, Space.local);
+            moon.transform.rotateLocallyByQuat(rotationInc2);
+            asteroid.transform.rotateLocallyByQuat(rotationInc3);
             earth.render(renderer);
             moon.render(renderer);
             asteroid.render(renderer);
 
             renderer.flush();
         },
-    }
+    };
 };

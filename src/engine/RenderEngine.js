@@ -1,6 +1,6 @@
 import { vec4 } from "gl-matrix";
 
-import createRenderer from "./renderer";
+import createRenderer from "../renderer";
 
 export default (ctx) => {
     let lights = [

@@ -1,6 +1,12 @@
+import Color from '@/core/Color';
 import Engine, { CAMERA_CLEAR_FLAGS } from '@/core/Engine';
-import { vec3, vec4, mat4 } from "gl-matrix";
-import Behaviour from './Behaviour';
+import Gizmos from '@/core/Gizmos';
+import Object3D from '@/core/Object3D';
+
+import Matrix4x4 from '@/math3d/Matrix4x4';
+import Plane from '@/math3d/Plane';
+import Vector3 from '@/math3d/Vector3';
+import Vector4 from '@/math3d/Vector4';
 
 // Private scope
 
@@ -76,19 +82,9 @@ function calculateFrustumPlanes() {
     ];
 }
 
-export default class Camera extends Behaviour {
-    fieldOvView = 60;
-    near = 0.05;
-    nearClipPlane = 1000;
-    farClipPlane = { x: 0, y: 0, width: 1, height: 1 };
-    orthographic = false;
-    orthographicSize = 1;
-
-    constructor(gameObject) {
-        super(gameObject);
-
-        const rect = { x: 0, y: 0, width: 1, height: 1 };
-        const fov = 60, near = 0.05, far = 1000;
+export default class Camera extends Object3D {
+    constructor(rect = { x: 0, y: 0, width: 1, height: 1 }, fov = 60, near = 0.05, far = 1000) {
+        super();
 
         this.fieldOvView = fov;
         this.rect = rect;
@@ -107,16 +103,49 @@ export default class Camera extends Behaviour {
         // if this isn't null, they would prevent calculation of defatult culling matrix
         this._customCullingMatrix = null;
 
-        this.backgroundColor = new Float32Array([0.2588, 0.5255, 0.9568, 1]); // Nice blue
+        this.clearFlags = CAMERA_CLEAR_FLAGS.SOLID_COLOR;
+        this.backgroundColor = new Color(0.2588, 0.5255, 0.9568, 1); // Nice blue
 
-        this._calculatedProjectionMatrix    = mat4.create();
-        this._calculatedWorldToCameraMatrix = mat4.create();
+        this._calculatedProjectionMatrix    = Matrix4x4.identity;
+        this._calculatedWorldToCameraMatrix = Matrix4x4.identity;
         this._frustumPlanes = [];
         calculateDefaultProjectionMatrix.call(this);
         calculateDefaultWorldToCameraMatrix.call(this);
     }
 
-    render(rederer) {
+    setPositionAndRotation(position, transform) {
+        super.setPositionAndRotation(position, transform);
+        calculateDefaultWorldToCameraMatrix.call(this);
+    }
+
+    render(objects) {
+        const eng = Engine.getInstance();
+
+        if (!objects) {
+            super.render && super.render();
+
+            if (eng.settings.debug) {
+                eng.uniforms.modelMatrix = this.localToWorldMatrix;
+
+                const fcorners = this.calculateFrustumCorners();
+
+                Gizmos.drawLine(fcorners[0], fcorners[1]);
+                Gizmos.drawLine(fcorners[1], fcorners[2]);
+                Gizmos.drawLine(fcorners[2], fcorners[3]);
+                Gizmos.drawLine(fcorners[3], fcorners[0]);
+
+                Gizmos.drawLine(fcorners[4], fcorners[5]);
+                Gizmos.drawLine(fcorners[5], fcorners[6]);
+                Gizmos.drawLine(fcorners[6], fcorners[7]);
+                Gizmos.drawLine(fcorners[7], fcorners[4]);
+
+                Gizmos.drawLine(fcorners[0], fcorners[4]);
+                Gizmos.drawLine(fcorners[1], fcorners[5]);
+                Gizmos.drawLine(fcorners[2], fcorners[6]);
+                Gizmos.drawLine(fcorners[3], fcorners[7]);
+            }
+            return;
+        }
 
 
         const { x, y, width, height } = this.pixelRect;
@@ -130,9 +159,10 @@ export default class Camera extends Behaviour {
         const camPos = this.position.clone();
         camPos.z *= -1; // to right hand
 
-        rederer.viewport(x, y, width, height);
-        rederer.clearColor(this.backgroundColor);
-        rederer.clear(this.backgroundColor);
+        eng.viewport(x, y, width, height);
+        eng.scissor(x, y, width, height);
+        eng.clearColor(this.backgroundColor);
+        eng.clear(this.clearFlags);
 
         // TODO: Remove hardcoded light source when lighting is supported
         const lightPosition = this.worldToCameraMatrix.transformVector4([10, 10, -10, 0]);
@@ -215,20 +245,20 @@ export default class Camera extends Behaviour {
             o.children.forEach(child => culling(child));
         };
 
-        // objects.forEach(o => culling(o));
+        objects.forEach(o => culling(o));
 
-        // objectsOnCamera.sort((a, b) => a.z - b.z);
+        objectsOnCamera.sort((a, b) => a.z - b.z);
 
-        // objectsOnCamera.forEach(o => {
-        //     const { object: { localToWorldMatrix }, object } = o;
-        //     const modelViewMatrix = eng.uniforms.viewMatrix.mul(localToWorldMatrix);
+        objectsOnCamera.forEach(o => {
+            const { object: { localToWorldMatrix }, object } = o;
+            const modelViewMatrix = eng.uniforms.viewMatrix.mul(localToWorldMatrix);
 
-        //     eng.uniforms.modelMatrix = localToWorldMatrix;
-        //     eng.uniforms.modelViewMatrix = modelViewMatrix,
-        //     eng.uniforms.normalMatrix = modelViewMatrix.inverse.get3x3(eng.uniforms.normalMatrix || []);
+            eng.uniforms.modelMatrix = localToWorldMatrix;
+            eng.uniforms.modelViewMatrix = modelViewMatrix,
+            eng.uniforms.normalMatrix = modelViewMatrix.inverse.get3x3(eng.uniforms.normalMatrix || []);
 
-        //     object.render();
-        // });
+            object.render();
+        });
     }
 
     get pixelRect() {
@@ -277,32 +307,32 @@ export default class Camera extends Behaviour {
         calculateFrustumPlanes.call(this);
     }
 
-    // calculateFrustumCorners(z) {
-    //     const aperture = Math.tan(this.fieldOvView * Math.PI / 360.0);
-    //     const nymax = this.nearClipPlane * aperture;
-    //     const nymin = -nymax;
-    //     const nxmin = nymin * this.aspect;
-    //     const nxmax = nymax * this.aspect;
+    calculateFrustumCorners(z) {
+        const aperture = Math.tan(this.fieldOvView * Math.PI / 360.0);
+        const nymax = this.nearClipPlane * aperture;
+        const nymin = -nymax;
+        const nxmin = nymin * this.aspect;
+        const nxmax = nymax * this.aspect;
 
-    //     const fymax = this.farClipPlane * aperture;
-    //     const fymin = -fymax;
-    //     const fxmin = fymin * this.aspect;
-    //     const fxmax = fymax * this.aspect;
+        const fymax = this.farClipPlane * aperture;
+        const fymin = -fymax;
+        const fxmin = fymin * this.aspect;
+        const fxmax = fymax * this.aspect;
 
-    //     return [
-    //         new Vector3(nxmax, nymax, this.nearClipPlane),
-    //         new Vector3(nxmax, nymin, this.nearClipPlane),
-    //         new Vector3(nxmin, nymin, this.nearClipPlane),
-    //         new Vector3(nxmin, nymax, this.nearClipPlane),
+        return [
+            new Vector3(nxmax, nymax, this.nearClipPlane),
+            new Vector3(nxmax, nymin, this.nearClipPlane),
+            new Vector3(nxmin, nymin, this.nearClipPlane),
+            new Vector3(nxmin, nymax, this.nearClipPlane),
 
-    //         new Vector3(fxmax, fymax, z ? z : this.farClipPlane),
-    //         new Vector3(fxmax, fymin, z ? z : this.farClipPlane),
-    //         new Vector3(fxmin, fymin, z ? z : this.farClipPlane),
-    //         new Vector3(fxmin, fymax, z ? z : this.farClipPlane)
-    //     ];
-    // }
+            new Vector3(fxmax, fymax, z ? z : this.farClipPlane),
+            new Vector3(fxmax, fymin, z ? z : this.farClipPlane),
+            new Vector3(fxmin, fymin, z ? z : this.farClipPlane),
+            new Vector3(fxmin, fymax, z ? z : this.farClipPlane)
+        ];
+    }
 
-    worldToViewportPoint(out, v) {
+    worldToViewportPoint(v, result = Vector4.zero) {
         result = this.worldToCameraMatrix.transformPoint(v, result);
         result = this.projectionMatrix.transformVector4(result, result);
 

@@ -4,8 +4,9 @@ export default class Renderer extends Behaviour {
     mesh = null;
     material = null;
 
-    render(renderer, deferredRender = false) {
-        const { mesh, transform, material } = this;
+    render(deferredRender = false) {
+        const { engine, mesh, transform, material } = this;
+        const { renderer } = engine;
         const { passes, uniforms } = material;
         renderer.modelMatrix = transform.getLocalToWorldMatrix(renderer.modelMatrix);
         renderer.uniforms = uniforms;

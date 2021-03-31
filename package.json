@@ -8,6 +8,7 @@
     "build": "parcel build index.html"
   },
   "dependencies": {
+    "deepmerge": "4.2.2",
     "gl-matrix": "^3.3.0"
   },
   "devDependencies": {

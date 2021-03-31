@@ -31,7 +31,8 @@ export default function(canvas) {
 
     //const model = Mesh.loadOBJ(tigerObj, 0.002);
     // model.calculateNormals();
-    const model = Mesh.createKnot(2, 5, 0.75, 0.15, 16, 64);
+    const model = Mesh.createKnot(2, 5, 0.75, 0.15, 8, 48);
+    const meshBuffer = model.createBuffer();
 
     const lights = [
         { position: [0, 1, 1, 0], color: [1, 1, 1] },
@@ -75,7 +76,7 @@ export default function(canvas) {
             renderer.vertexShader = phongVertexShader;
             renderer.fragShader = celFragShader;
             renderer.cullFace = -1;
-            renderer.render(model);
+            renderer.render(meshBuffer);
 
             // outline
             mat4.fromTranslation(modelMatrix, [0, 0, 0]);
@@ -86,9 +87,9 @@ export default function(canvas) {
             renderer.fragShader = defaultFragShader;
             renderer.uniforms = outlineUniforms;
             renderer.cullFace = 1;
-            renderer.render(model);
+            renderer.render(meshBuffer);
 
             renderer.flush();
         },
-    }
+    };
 };

@@ -14,7 +14,7 @@ export default function(canvas) {
     const viewMatrix = mat4.create();
     const modelMatrix = mat4.create();
 
-    const box = Mesh.createBox(1, 1, 1);
+    const box = Mesh.createBox(1, 1, 1).createBuffer();
 
     const lights = [
         { position: [0, 1, 1, 0], color: [1, 1, 1] },
@@ -57,5 +57,5 @@ export default function(canvas) {
 
             renderer.flush();
         },
-    }
+    };
 };

@@ -8,6 +8,7 @@ export default class Behaviour {
 
     get gameObject() { return this.#gameObject; }
     get transform() { return this.gameObject.transform; }
+    get engine() { return this.gameObject.engine; }
     get name() { return this.gameObject.name; }
     set name(value) { this.gameObject.name = value; }
     get enabled() { return this.#enabled; }

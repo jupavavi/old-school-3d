@@ -1,4 +1,7 @@
 import "./gameCanvas.css";
+import { glMatrix } from "gl-matrix";
+
+glMatrix.setMatrixArrayType(Array);
 
 const MAX_WIDTH = 256;
 const MAX_HEIGHT = 224;

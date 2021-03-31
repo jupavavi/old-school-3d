@@ -19,7 +19,7 @@ export default function(canvas) {
     const viewMatrix = mat4.create();
     
     const mesh = new Mesh({
-        vertices: [
+        position: [
             [-100,  0, -100],
             [-100,  0,  100],
             [ 100,  0,  100],
@@ -51,6 +51,9 @@ export default function(canvas) {
     // mesh.subMeshes.forEach(subMesh => subMesh.topology = "LINES");
     // const mesh2 = Mesh.createKnot(2, 5, 1, 0.2, 32, 64);
     const transform = mat4.create();
+
+    const buffer1 = mesh.createBuffer();
+    const buffer2 = mesh2.createBuffer();
 
     // mesh2.subMeshes.forEach(subMesh => subMesh.topology = "LINE_LOOP");
 
@@ -132,7 +135,7 @@ export default function(canvas) {
             // mat4.rotate(transform, transform, angle, [0, 1, 0]);
             renderer.modelMatrix = transform;
             renderer.cullFace = -1;
-            renderer.render(mesh);
+            renderer.render(buffer1);
             
             angle += 35 * TO_RAD * time.deltaTime;
             mat4.fromTranslation(transform, [0, 0, -1]);
@@ -144,7 +147,7 @@ export default function(canvas) {
             renderer.vertexShader = waterShader;
             // renderer.fragShader = checkersFragShader;
             renderer.fragShader = defaultFragShader;
-            renderer.render(mesh2);
+            renderer.render(buffer2);
     
             renderer.flush();
         },

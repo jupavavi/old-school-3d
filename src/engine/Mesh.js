@@ -1,10 +1,10 @@
 import { vec3 } from "gl-matrix";
 import { createKnotCurve, normalFrom3Points } from './utils';
-
+import MeshBuffer from "../renderer/MeshBuffer";
 
 export default class Mesh {
     constructor({
-        vertices = [],
+        position = [],
         normal = [],
         tangent = [],
         uv = [],
@@ -14,7 +14,7 @@ export default class Mesh {
         indices = null,
         subMeshes,
     }) {
-        this.vertices = vertices;
+        this.position = position;
         this.normal = normal;
         this.tangent = tangent;
         this.uv = uv;
@@ -24,18 +24,18 @@ export default class Mesh {
         this.indices = indices;
         this.subMeshes = subMeshes || [{
             elementsOffset: 0,
-            elementsCount: !Number.isNaN(indices?.length) ? indices.length : vertices.length,
+            elementsCount: !Number.isNaN(indices?.length) ? indices.length : position.length,
             topology: 'TRIANGLES',
         }];
         this.calculateBounds();
     }
 
     calculateNormals() {
-        if (this.vertices.length === 0 || this.indices.length === 0) {
+        if (this.position.length === 0 || this.indices.length === 0) {
             return;
         }
 
-        const normal = this.vertices.map(() => ({ normal: [0, 0, 0], count: 0 }));
+        const normal = this.position.map(() => ({ normal: [0, 0, 0], count: 0 }));
         const tmpNormal = [0, 0, 0];
 
         for(let t = 0; t < this.indices.length; t += 3) {
@@ -43,9 +43,9 @@ export default class Mesh {
             const i1 = this.indices[t + 1];
             const i2 = this.indices[t + 2];
 
-            const v0 = this.vertices[i0];
-            const v1 = this.vertices[i1];
-            const v2 = this.vertices[i2];
+            const v0 = this.position[i0];
+            const v1 = this.position[i1];
+            const v2 = this.position[i2];
 
             normalFrom3Points(tmpNormal, v0, v1, v2);
 
@@ -65,14 +65,14 @@ export default class Mesh {
     }
 
     calculateBounds() {
-        if (this.vertices.length === 0) {
+        if (this.position.length === 0) {
             return;
         }
 
         const min = [Number.MAX_VALUE, Number.MAX_VALUE, Number.MAX_VALUE];
         const max = [Number.MIN_VALUE, Number.MIN_VALUE, Number.MIN_VALUE];
 
-        this.vertices.forEach(([x, y, z]) => {
+        this.position.forEach(([x, y, z]) => {
             min[0] = Math.min(x, min[0]);
             min[1] = Math.min(y, min[1]);
             min[2] = Math.min(z, min[2]);
@@ -100,7 +100,7 @@ export default class Mesh {
 
     triangularize(resolution) {
         const {
-            vertices,
+            position,
             normal,
             uv,
             subMeshes,
@@ -123,15 +123,15 @@ export default class Mesh {
             let index = pointCache[cacheKey];
             if (index !== undefined) return index;
 
-            const v1 = vertices[p1];
-            const v2 = vertices[p2];
+            const v1 = position[p1];
+            const v2 = position[p2];
 
             const n1 = normal[p1];
             const n2 = normal[p2];
             const u1 = uv[p1];
             const u2 = uv[p2];
 
-            index = vertices.push(middle(v1, v2)) - 1;
+            index = position.push(middle(v1, v2)) - 1;
             if (n1 && n2) {
                 normal.push(middle(n1, n2));
             }
@@ -169,8 +169,12 @@ export default class Mesh {
         }
     }
 
+    createBuffer() {
+        return new MeshBuffer(this);
+    }
+
     static createKnot(q, p, size = 1, radius = 0.5, slices = 10, rings = 10) {
-        const indicesData = Array(slices * rings * 6); // 2 triangles per square * 3 vertices indices
+        const indicesData = Array(slices * rings * 6); // 2 triangles per square * 3 position indices
         const verticesCount = (slices + 1) * (rings + 1);
         const verticesData = Array(verticesCount);
         const normalsData = Array(verticesCount);
@@ -255,7 +259,7 @@ export default class Mesh {
         }
 
         return new Mesh({
-            vertices: verticesData,
+            position: verticesData,
             indices: indicesData,
             normal: normalsData,
             uv: uvData,
@@ -263,7 +267,7 @@ export default class Mesh {
     }
 
     static createSphere(radius = 1, slices = 60, stacks = 60) {
-        const indicesData = Array(slices * stacks * 6); // 3 vertices indices * 2 triangle per quad
+        const indicesData = Array(slices * stacks * 6); // 3 position indices * 2 triangle per quad
         const verticesCount = (slices + 1) * (stacks + 1);
         const verticesData = Array(verticesCount);
         const normalsData = Array(verticesCount);
@@ -328,7 +332,7 @@ export default class Mesh {
         }
 
         return new Mesh({
-            vertices: verticesData,
+            position: verticesData,
             indices: indicesData,
             normal: normalsData,
             uv: uvData,
@@ -340,7 +344,7 @@ export default class Mesh {
         const hh = 0.5 * h;
         const hd = 0.5 * d;
 
-        const vertices = [
+        const position = [
             // FRONT
             [-hw, -hh,  hd],
             [ hw, -hh,  hd],
@@ -447,7 +451,7 @@ export default class Mesh {
         // ].map(c => [c, c, c, c]).reduce((a, b) => a.concat(b));
 
         return new Mesh({
-            vertices,
+            position,
             indices,
             normal,
             uv,
@@ -465,7 +469,7 @@ export default class Mesh {
 
         const { PI, acos, atan2 } = Math;
 
-        const vertices = [
+        const position = [
             [ -x, +n, -z ],
             [ +x, +n, -z ],
             [ -x, +n, +z ], // 2
@@ -558,7 +562,7 @@ export default class Mesh {
         uv[17][0] = 1;
 
         return new Mesh({
-            vertices,
+            position,
             indices,
             normal,
             uv,
@@ -572,10 +576,10 @@ export default class Mesh {
         if (subdivisions <= 0) {
             return icosphere;
         }
-        const { vertices, normal, uv, indices } = icosphere;
-        const { length } = vertices;
+        const { position, normal, uv, indices } = icosphere;
+        const { length } = position;
         for(let v = 0; v < length; v++) {
-            const vertex = vertices[v];
+            const vertex = position[v];
             vec3.normalize(vertex, vertex);
             vec3.copy(normal[v], vertex);
             const { 0: nx, 1: ny, 2: nz } = normal[v];
@@ -649,9 +653,9 @@ export default class Mesh {
             g: groups,
         } = rawModel;
 
-        const vertices = v.map(([x, y, z]) => [x * scale, y * scale, z * scale]);
-        const normal  = vn.length > 0 ? Array(vertices.length).fill(null) : undefined;
-        const uv       = vt.length > 0 ? Array(vertices.length).fill(null) : undefined;
+        const position = v.map(([x, y, z]) => [x * scale, y * scale, z * scale]);
+        const normal  = vn.length > 0 ? Array(position.length).fill(null) : undefined;
+        const uv       = vt.length > 0 ? Array(position.length).fill(null) : undefined;
         let indices = [];
         const subMeshes = [];
 
@@ -662,7 +666,7 @@ export default class Mesh {
             let v2 = -1;
             for (let p = 0; p < length; p++) {
                 let { vi, ti = -1, ni = -1 } = polygon[p]; // eslint-disable-line prefer-const
-                if (uv && uv[vi]) vi = vertices.push(vertices[vi]) - 1;
+                if (uv && uv[vi]) vi = position.push(position[vi]) - 1;
 
                 if (p === 0) v0 = vi;
                 else if (p === 1) v1 = vi;
@@ -692,13 +696,13 @@ export default class Mesh {
                 indices = indices.concat(triangles);
             }
         });
-        for (let i = vertices.length - 1; i >=0 && (normal || uv); i--) {
+        for (let i = position.length - 1; i >=0 && (normal || uv); i--) {
             if (normal) normal[i] = normal[i] || [0, 0, 0];
             if (uv) uv[i] = uv[i] || [0, 0];
         }
 
         return new Mesh({
-            vertices,
+            position,
             normal,
             uv,
             subMeshes,

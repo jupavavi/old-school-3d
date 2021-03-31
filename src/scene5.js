@@ -4,7 +4,7 @@ import vertexLitShader from "./renderer/shaders/vertex/vertexLit";
 import defaultFragShader from "./renderer/shaders/frag/default";
 import Mesh from "./engine/Mesh";
 import { TO_RAD } from "./engine/utils";
-import Transform, { Space } from "./engine/Transform";
+import Transform from "./engine/Transform";
 
 const createRendererWithLights = (ctx) => {
     let lights = [
@@ -39,7 +39,7 @@ const createRendererWithLights = (ctx) => {
 };
 
 const createObject3d = ({
-    mesh,
+    meshBuffer,
     vertexShader,
     fragShader,
     uniforms,
@@ -50,12 +50,12 @@ const createObject3d = ({
         transform,
         uniforms,
         render(renderer) {
-            transform.getLocalToWorldMatrix(renderer.modelMatrix);
+            renderer.modelMatrix = transform.localToWorldMatrix;
             renderer.uniforms = uniforms;
             renderer.vertexShader = vertexShader;
             renderer.fragShader = fragShader;
 
-            renderer.render(mesh);
+            renderer.render(meshBuffer);
         },
     };
 };
@@ -68,10 +68,11 @@ export default function(canvas) {
     const projectionMatrix = mat4.create();
     const viewMatrix = mat4.create();
 
-    const sphere = Mesh.createIcosphere(0.5, 2);
+    const sphere = Mesh.createIcosphere(0.5, 3);
+    const meshBuffer = sphere.createBuffer();
 
     const earth = createObject3d({
-        mesh: sphere,
+        meshBuffer,
         vertexShader: vertexLitShader,
         fragShader: defaultFragShader,
         uniforms: {
@@ -83,7 +84,7 @@ export default function(canvas) {
     });
 
     const moon = createObject3d({
-        mesh: sphere,
+        meshBuffer,
         vertexShader: vertexLitShader,
         fragShader: defaultFragShader,
         uniforms: {
@@ -96,7 +97,7 @@ export default function(canvas) {
     });
 
     const asteroid = createObject3d({
-        mesh: sphere,
+        meshBuffer,
         vertexShader: vertexLitShader,
         fragShader: defaultFragShader,
         uniforms: {
@@ -108,14 +109,14 @@ export default function(canvas) {
         },
     });
 
-    earth.transform.setPosition([0, 0, 0]);
-    earth.transform.rotateByQuat(quat.fromEuler([0, 0, 0, 1], 0, 0, 23.5));
-    moon.transform.setLocalScale([0.4, 0.4, 0.4]);
+    earth.transform.position = [0, 0, 0];
+    earth.transform.rotation = quat.fromEuler([0, 0, 0, 1], 0, 0, 23.5);
     moon.transform.parent = earth.transform;
-    moon.transform.setLocalPosition([1.25, 0, 0]);
-    asteroid.transform.setLocalScale([0.5, 0.5, 0.5]);
+    moon.transform.localScale = [0.4, 0.4, 0.4];
+    moon.transform.localPosition = [1.25, 0, 0];
     asteroid.transform.parent = moon.transform;
-    asteroid.transform.setLocalPosition([1, 0, 0]);
+    asteroid.transform.localScale = [0.5, 0.5, 0.5];
+    asteroid.transform.localPosition = [1, 0, 0];
 
     const rotationInc1 = quat.fromEuler([0, 0, 0, 1], 0, 0.5, 0);
     const rotationInc2 = quat.fromEuler([0, 0, 0, 1], 0, -2, 0);
@@ -134,13 +135,8 @@ export default function(canvas) {
     renderer.depthWriteEnabled = false;
 
     const camPosition = [0, 0, 2.5];
-    const dsta = new Float32Array(4);
-    const dstb = new Float32Array(4);
     const sorter = (a, b) => {
-        a.transform.getPosition(dsta);
-        b.transform.getPosition(dstb);
-
-        return vec3.sqrDist(camPosition, dstb) - vec3.sqrDist(camPosition, dsta);
+        return vec3.sqrDist(camPosition, b.transform.position) - vec3.sqrDist(camPosition, a.transform.position);
     };
     const forEachRender = obj => obj.render(renderer);
 
@@ -150,7 +146,7 @@ export default function(canvas) {
             mat4.perspective(projectionMatrix, 60 * TO_RAD, aspect, 0.5, 100);
             renderer.projectionMatrix = projectionMatrix;
             renderer.resize();
-            //renderer.viewport = { x: 0.25, y: 0.25, width: 0.5 * aspect, height: 0.5 };
+            // renderer.viewport = { x: 0.25, y: 0.25, width: 0.5 * aspect, height: 0.5 };
         },
         render({ time }) {
             renderer.clear();
@@ -158,8 +154,8 @@ export default function(canvas) {
             mat4.lookAt(viewMatrix, camPosition, [0, 0, 0], [0, 1, 0]);
             renderer.viewMatrix = viewMatrix;
             earth.transform.rotateByQuat(rotationInc1);
-            moon.transform.rotateByQuat(rotationInc2, Space.local);
-            asteroid.transform.rotateByQuat(rotationInc3, Space.local);
+            moon.transform.rotateLocallyByQuat(rotationInc2);
+            asteroid.transform.rotateLocallyByQuat(rotationInc3);
 
             objects.sort(sorter);
 
@@ -170,5 +166,5 @@ export default function(canvas) {
 
             renderer.flush();
         },
-    }
+    };
 };

@@ -1,4 +1,4 @@
-import Transform from "../Transform";
+import Transform from "./Transform";
 
 export default class GameObject {
     #transform = null;
@@ -6,11 +6,13 @@ export default class GameObject {
     #nonStartedBehaviours = [];
     #behaviours = [];
     #active = false;
+    #engine = null;
     tag = "";
     layer = 0;
 
-    constructor(name, behaviours, children) {
+    constructor({ name, behaviours, children, engine, transform }) {
         this.#transform = new Transform(name);
+        this.#engine = engine;
 
         Object.defineProperty(this.#transform, "gameObject", {
             value: this,
@@ -18,6 +20,7 @@ export default class GameObject {
             enumerable: true,
             configurable: true, // allows transform to be deleted - internal use only
         });
+        Object.assign(this.#transform, transform);
 
         // eslint-disable-next-line no-unused-expressions
         children?.forEach((child) => child.transform.parent = this.#transform);
@@ -29,6 +32,7 @@ export default class GameObject {
     }
 
     get transform() { return this.#transform; }
+    get engine() { return this.#engine; }
     get name() { return this.transform.name; }
     set name(value) { this.transform.name = value; }
     get active() { return this.#active; }

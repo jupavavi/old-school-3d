@@ -1,86 +1,49 @@
 import { vec3, mat4, quat } from "gl-matrix";
 import SimpleTree from "./SimpleTree";
 
-const { BYTES_PER_ELEMENT } = Float32Array;
-
-export const Space = Object.freeze({
-    world: 0,
-    local: 1,
-});
-
 export default class Transform extends SimpleTree {
-    #localRotation       = new Float32Array(4); // quaternion
-    #localPosition       = new Float32Array(3); // vec3
-    #localScale          = new Float32Array(3); // vec3
+    // LOCAL PROPS
+    #localRotation = [0, 0, 0, 1]; // quaternion (gl-matrix uses index-3 as w for quaternions)
+    #localPosition = [0, 0, 0]; // vec3
+    #localScale    = [1, 1, 1]; // vec3
     
-    #matrix              = new Float32Array(16); // mat4
-    #invMat              = new Float32Array(16); // mat4
-    #position            = new Float32Array(this.#matrix.buffer, 12 * BYTES_PER_ELEMENT, 3); // data view of #matrix as vec3
-    #rotation            = new Float32Array(4); // quaternion
+    // GLOBAL PROPS
+    #matrix        = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]; // mat4
+    #invMat        = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]; // mat4
+    #position      = [0, 0, 0];
+    #rotation      = [0, 0, 0, 1]; // quaternion (gl-matrix uses index-3 as w for quaternions)
+    #lossyScale    = [1, 1, 1]; // vec3
+    #right         = [1, 0, 0]; // vec3
+    #up            = [0, 1, 0]; // vec3
+    #forward       = [0, 0,-1]; // vec3
 
-    constructor(name) {
-        super(name);
+    // SETTERS AND GETTERS
+    // TODO: set up, right and forward
+    get up() { return this.#up; }
+    get right() { return this.#right; }
+    get forward() { return this.#forward; }
 
-        this.#matrix[ 0] = 1;
-        this.#matrix[ 5] = 1;
-        this.#matrix[10] = 1;
-        this.#matrix[15] = 1;
-
-        this.#invMat[ 0] = 1;
-        this.#invMat[ 5] = 1;
-        this.#invMat[10] = 1;
-        this.#invMat[15] = 1;
-        // set rotation
-        this.#rotation[3]      = 1; // gl-matrix uses index-3 as w for quaternions
-        this.#localRotation[3] = 1; // gl-matrix uses index-3 as w for quaternions
-        // scale set to one
-        this.#localScale[0] = 1;
-        this.#localScale[1] = 1;
-        this.#localScale[2] = 1;
-    }
-
-    getUp(out) {
-        vec3.set(out, 0, 1, 0);
-        return vec3.transformQuat(out, out, this.#rotation);
-    }
-
-    getRight(out) {
-        vec3.set(out, 1, 0, 0);
-        return vec3.transformQuat(out, out, this.#rotation);
-    }
-
-    getForward(out) {
-        vec3.set(out, 0, 0, -1);
-        return vec3.transformQuat(out, out, this.#rotation);
-    }
-
-    getLocalPosition(out) { return vec3.copy(out, this.#localPosition); }
-    setLocalPosition(value) {
+    get localPosition() { return this.#localPosition; }
+    set localPosition(value) {
         vec3.copy(this.#localPosition, value);
         this.update();
     }
-    getLocalScale(out) { return vec3.copy(out, this.#localScale); }
-    setLocalScale(value) {
+
+    get localScale() { return this.#localScale; }
+    set localScale(value) {
         vec3.copy(this.#localScale, value);
         this.update();
     }
-    getLocalRotation(out) { return quat.copy(out, this.#localRotation); }
-    setLocalRotation(value) {
+
+    get localRotation() { return this.#localRotation; }
+    set localRotation(value) {
         quat.copy(this.#localRotation, value);
         quat.normalize(this.#localRotation, this.#localRotation);
         this.update();
     }
-    getPosition(out) {
-        return vec3.copy(out, this.#position);
-    }
-    setPosition(value) {
-        vec3.transformMat4(this.#localPosition, value, this.#invMat);
-        this.update();
-    }
-    getRotation(out) {
-        return quat.copy(out, this.#rotation);
-    }
-    setRotation(value) {
+
+    get rotation() { return this.#rotation; }
+    set rotation(value) {
         const { parent } = this;
         if (parent) {
             quat.conjugate(this.#localRotation, parent.#rotation);
@@ -91,21 +54,19 @@ export default class Transform extends SimpleTree {
         }
         this.update();
     }
-    getLossyScale(out) {
-        return mat4.getScaling(out, this.#matrix);
+
+    get position() { return this.#position; }
+    set position(value) {
+        vec3.transformMat4(this.#localPosition, value, this.#invMat);
+        this.update();
     }
-    getLocalToWorldMatrix(out) {
-        return mat4.copy(out, this.#matrix);
-    }
-    getWorldToLocalMatrix(out) {
-        return mat4.copy(out, this.#invMat);
-    }
-    toWorldPosition(out, point) {
-        return vec3.transformMat4(out, point, this.#matrix);
-    }
-    toLocalPosition(out, point) {
-        return vec3.transformMat4(out, point, this.#invMat);
-    }
+
+    get lossyScale() { return this.#lossyScale; }
+
+    get localToWorldMatrix() { return this.#matrix; }
+    get worldToLocalMatrix() { return this.#invMat; }
+
+    // METHODS
     update() {
         mat4.fromRotationTranslationScale(
             this.#matrix,
@@ -123,36 +84,57 @@ export default class Transform extends SimpleTree {
             quat.normalize(this.#rotation, this.#rotation);
             mat4.multiply(this.#matrix, parent.#matrix, this.#matrix);
         }
+        vec3.set(this.#position, this.#matrix[12], this.#matrix[13], this.#matrix[14]);
+        mat4.getScaling(this.#lossyScale, this.#matrix);
+        vec3.set(this.#right  , 1, 0, 0);
+        vec3.set(this.#up     , 0, 1, 0);
+        vec3.set(this.#forward, 0, 0,-1);
+        vec3.transformQuat(this.#up, this.#up, this.#rotation);
+        vec3.transformQuat(this.#right, this.#right, this.#rotation);
+        vec3.transformQuat(this.#forward, this.#forward, this.#rotation);
+
         mat4.invert(this.#invMat, this.#matrix);
 
-        for(let child of children) {
-            child.update();
-        }
+        for(let child of children) { child.update(); }
     }
 
-    translateByVector(dir, space = Space.world) {
-        this.translateByValues(dir[0], dir[1], dir[2], space);
+    toWorldPosition(out, point) {
+        return vec3.transformMat4(out, point, this.#matrix);
     }
-    translateByValues(x, y, z, space = Space.world) {
-        if (space === Space.world) {
-            this.#localPosition[0] = this.#position[0] + x;
-            this.#localPosition[1] = this.#position[1] + y;
-            this.#localPosition[2] = this.#position[2] + z;
-            this.toLocalPosition(this.#localPosition, this.#localPosition);
-        } else {
-            this.#localPosition[0] += x;
-            this.#localPosition[1] += y;
-            this.#localPosition[2] += z;
-        }
+
+    toLocalPosition(out, point) {
+        return vec3.transformMat4(out, point, this.#invMat);
+    }
+
+    translateByVector(dir) {
+        this.translateByValues(dir[0], dir[1], dir[2]);
+    }
+
+    translateLocallyByVector(dir) {
+        this.translateLocallyByValues(dir[0], dir[1], dir[2]);
+    }
+
+    translateByValues(x, y, z) {
+        this.#localPosition[0] = this.#position[0] + x;
+        this.#localPosition[1] = this.#position[1] + y;
+        this.#localPosition[2] = this.#position[2] + z;
+        this.toLocalPosition(this.#localPosition, this.#localPosition);
         this.update();
     }
-    rotateByQuat(rotation, space = Space.world) {
-        if (space === Space.world) {
-            quat.mul(this.#rotation, this.#rotation, rotation);
-            this.setRotation(this.#rotation);
-        } else {
-            quat.mul(this.#localRotation, this.#localRotation, rotation);
-            this.setLocalRotation(this.#localRotation);
-        }
+
+    translateLocallyByValues(x, y, z) {
+        this.#localPosition[0] += x;
+        this.#localPosition[1] += y;
+        this.#localPosition[2] += z;
+        this.update();
+    }
+
+    rotateByQuat(rotation) {
+        quat.mul(this.#rotation, this.#rotation, rotation);
+        this.rotation = this.#rotation;
+    }
+    rotateLocallyByQuat(rotation) {
+        quat.mul(this.#localRotation, this.#localRotation, rotation);
+        this.localRotation = this.#localRotation;
     }
 }

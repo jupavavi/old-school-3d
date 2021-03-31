@@ -45,6 +45,8 @@ export default function (canvas) {
         },
     ];
     tunnel.normal.forEach((n) => vec3.negate(n, n));
+    
+    const meshBuffer = tunnel.createBuffer();
 
     const uniforms = {
         diffuse: [1, 1, 1, 1],
@@ -98,9 +100,9 @@ export default function (canvas) {
             renderer.fragShader = phongFragShader;
             renderer.cullFace = 1;
 
-            renderer.render(tunnel);
+            renderer.render(meshBuffer);
 
             renderer.flush();
         },
-    }
+    };
 };
