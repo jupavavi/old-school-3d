@@ -65,9 +65,7 @@ export default (ctx) => {
         resize() { raster.resize(); },
         prepare() {
             mat4.mul(modelViewMatrix, viewMatrix, modelMatrix);
-            mat3.fromMat4(normalMatrix, modelViewMatrix);
-            mat3.invert(normalMatrix, normalMatrix);
-            mat3.transpose(normalMatrix, normalMatrix);
+            mat3.normalFromMat4(normalMatrix, modelViewMatrix);
             mat4.mul(pmvMatrix, projectionMatrix, modelViewMatrix);
             vec3.set(cameraPosition, -viewMatrix[12], -viewMatrix[13], -viewMatrix[14]);
 

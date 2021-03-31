@@ -1,37 +1,4 @@
-export const cloneVertex = (vertexData) => {
-    const out = {};
-    const attrs = Object.keys(vertexData);
-    const { length } = attrs;
-    for(let i = 0; i < length; i += 1) {
-        const attrName = attrs[i];
-        const value = vertexData[attrName];
-        out[attrName] = value?.slice?.() || value;
-    }
-    return out;
-};
-
-
-export const interpolateAttrs = (out, v0, v1, t) => {
-    const attrs = Object.keys(v0);
-    const { length } = attrs;
-
-    for(let i = 0; i < length; i += 1) {
-        const attrName = attrs[i];
-        const value0 = v0[attrName];
-        const value1 = v1[attrName];
-        const { length: valueLength = 1 } = value0 || 0;
-        // maybe there should be a better way to check array-like objects
-        if (valueLength <= 1) {
-            out[attrName] = value0 + (value1 - value0) * t;
-            continue;
-        }
-        const outValue = out[attrName] ? out[attrName] : [];
-        for(let c = 0; c < valueLength; c++) {
-            outValue[c] = value0[c] + (value1[c] - value0[c]) * t;
-        }
-        out[attrName] = outValue;
-    }
-};
+import Varyings from "./Varyings";
 
 export const LineClipOutcomes = {
     OUTSIDE  : 0, // 0000
@@ -67,12 +34,12 @@ export const clipLineAgainstViewPlane = (v0, v1, comp, sign) => {
     if (d0 <= 0) {
         // clip it out v0
         const t = d1 / (d1 - d0);
-        interpolateAttrs(v0, v1, v0, t);
+        v0.setInterpolation(v1, v0, t);
         outcome |= LineClipOutcomes.CLIPPED_0;
     } else if (d1 <= 0) {
         // clip it out v1
         const t = d0 / (d0 - d1);
-        interpolateAttrs(v1, v0, v1, t);
+        v1.setInterpolation(v0, v1, t);
         outcome |= LineClipOutcomes.CLIPPED_1;
     }
 
@@ -83,8 +50,8 @@ export const clipPolygonAgainstViewPlane = (vertices, comp, sign) => {
     const out = [];
     const { length } = vertices;
     for(let i = 0; i < length; i += 1) {
-        const tmp0 = cloneVertex(vertices[i]);
-        const tmp1 = cloneVertex(vertices[(i + 1) % length]);
+        const tmp0 = new Varyings(vertices[i]);
+        const tmp1 = new Varyings(vertices[(i + 1) % length]);
 
         let clipOutcome = clipLineAgainstViewPlane(tmp0, tmp1, comp, sign);
 
@@ -143,9 +110,7 @@ export const checkTriangle = (p0, p1, p2) => {
      || Math.max(r0, r1, r2) <= 0
      || Math.max(b0, b1, b2) <= 0
      || Math.max(t0, t1, t2) <= 0
-     ) {
-        return -1; // fully outside
-    }
+    ) return -1; // fully outside
 
     // triangle is fully inside
     if (Math.min(n0, n1, n2) > 0
@@ -154,29 +119,22 @@ export const checkTriangle = (p0, p1, p2) => {
      && Math.min(r0, r1, r2) > 0
      && Math.min(b0, b1, b2) > 0
      && Math.min(t0, t1, t2) > 0
-     ) {
-        return 1;
-    }
+    ) return 1;
 
     return 0;
 };
 
 export const clipTrangle = (v0, v1, v2) => {
     const checkingOutcome = checkTriangle(v0.position, v1.position, v2.position);
-    if (checkingOutcome === -1) {
-        return [];
-    }
-    if (checkingOutcome === 1) {
-        return [cloneVertex(v0), cloneVertex(v1), cloneVertex(v2)];
-    }
+    if (checkingOutcome === -1) return [];
+    if (checkingOutcome === 1) return [v0, v1, v2];
+
     let vertices = [v0, v1, v2];
     for (let p = 0; p < 6; p += 1) {
         const comp = (p / 2) | 0; // 0 for x, 1 for y and 2 for z
-        const sign = p % 2 === 0 ? -1 : 1; // alternates between possitive and negative
+        const sign = ((p % 2) * -2) + 1; // alternates between -1 and 1
         vertices = clipPolygonAgainstViewPlane(vertices, comp, sign);
-        if (vertices.length === 0) {
-            break;
-        }
+        if (vertices.length === 0) break;
     }
     return vertices;
 };

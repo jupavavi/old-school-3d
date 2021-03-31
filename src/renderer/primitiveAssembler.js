@@ -1,29 +1,5 @@
 import { numberToDefault } from "./utils";
-
-export const processVertex = (attrs, uniforms, shader) => {
-    // at least these outputs should be provided
-    const out = {
-        position: [0, 0, 0, 0],
-        color: [0, 0, 0, 0],
-    };
-
-    shader(out, attrs, uniforms);
-
-    return out;
-};
-
-export const extractAttrs = (buffer, index) => {
-    const { vertices, indices, subMeshes, ...attrsData } = buffer;
-    const attrsNames = Object.keys(attrsData);
-    const attrs = { position: vertices[index] };
-    const { length: attrsCount } = attrsNames;
-
-    for(let a = 0; a < attrsCount; a += 1) {
-        const attr = attrsNames[a];
-        attrs[attr] = attrsData[attr]?.[index];
-    }
-    return attrs;
-};
+import Varyings from "./Varyings";
 
 export default (raster) => {
     // keeps pre-located vertices data. This reduces GC cycles.
@@ -35,13 +11,13 @@ export default (raster) => {
     let buffer = null;
     
     const loadBuffer = (bufferData) => {
-        if (buffer !== bufferData) {
-            attrsSerial++; // attrs will extracted for the current buffer
+        if (buffer !== bufferData && bufferData) {
+            buffer = bufferData;
+            attrsSerial++;
         }
-        buffer = bufferData;
         // resizes the current array - yes, JS arrays are way too exotic
-        if (cache.length < buffer.vertices.length) {
-            cache.length = buffer.vertices.length;
+        if (cache.length < buffer.vertexCount) {
+            cache.length = buffer.vertexCount;
         }
     };
     const getVertex = (idx, uniforms, shader) => {
@@ -50,20 +26,20 @@ export default (raster) => {
             cache[idx] = {
                 renderSerial: -1,
                 attrsSerial: -1,
-                attrs: null,
-                data: null,
+                data: new Varyings(),
             };
         }
 
         if (cache[idx].attrsSerial !== attrsSerial) {
             // extracts attrs again
             cache[idx].attrsSerial = attrsSerial;
-            cache[idx].attrs = extractAttrs(buffer, idx);
+            cache[idx].attrs = buffer.getVertexData(idx);
         }
+
         if (cache[idx].renderSerial !== renderSerial) {
             // calculates data again
             cache[idx].renderSerial = renderSerial;
-            cache[idx].data = processVertex(cache[idx].attrs, uniforms, shader);
+            shader(cache[idx].data, cache[idx].attrs, uniforms);
         }
         return cache[idx].data; // returns the allocated vertex data
     };

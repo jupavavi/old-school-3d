@@ -1,4 +1,4 @@
-import { vec3, vec4 } from "gl-matrix";
+import { vec2, vec3, vec4 } from "gl-matrix";
 import { clamp, clampVec3Comp, phong, getTexture2DFrag } from "../utils";
 
 const translatePoint = (out, position, normal, speed, time, intensity, d) => {
@@ -20,7 +20,7 @@ export default (() => {
     const ref1 = vec3.create();
     const ref2 = vec3.create();
 
-    return (out, attrs, uniforms) => {
+    return (varyings, attrs, uniforms) => {
         const { position, normal, uv } = attrs;
         const {
             time,
@@ -58,13 +58,13 @@ export default (() => {
 
         vec4.mul(tmpDiffuse, diffuse, tmpDiffuse);
 
-        phong(out.color, cameraPosition, tmpPosition, tmpNormal, lights, specular, tmpDiffuse, shineness, emission, ambient);
-        vec3.scale(out.color, out.color, len);
-        clampVec3Comp(out.color, out.color, 0, 1);
+        phong(varyings.color, cameraPosition, tmpPosition, tmpNormal, lights, specular, tmpDiffuse, shineness, emission, ambient);
+        vec3.scale(varyings.color, varyings.color, len);
+        clampVec3Comp(varyings.color, varyings.color, 0, 1);
 
-        out.uv = uv;
+        vec2.copy(varyings.uv, uv);
 
-        vec4.set(out.position, tmpPosition[0], tmpPosition[1], tmpPosition[2], 1);
-        vec4.transformMat4(out.position, out.position, projectionMatrix);
+        vec4.set(varyings.position, tmpPosition[0], tmpPosition[1], tmpPosition[2], 1);
+        vec4.transformMat4(varyings.position, varyings.position, projectionMatrix);
     };
 })();

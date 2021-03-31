@@ -1,4 +1,4 @@
-import { vec3, vec4 } from "gl-matrix";
+import { vec2, vec3, vec4 } from "gl-matrix";
 import { cel, getTexture2DFrag } from "../utils";
 
 export default (() => {
@@ -8,7 +8,7 @@ export default (() => {
     const cameraPosition = vec3.create(); // [0, 0, 0]
     const defaultSpecular = vec3.fromValues(1, 1, 1); // [0, 0, 0]
 
-    return (out, attrs, uniforms) => {
+    return (varyings, attrs, uniforms) => {
         const { uv, normal, position } = attrs;
         const {
             diffuse,
@@ -21,7 +21,7 @@ export default (() => {
             pmvMatrix,
             lights,
             text1 = {},
-            textScale = 1
+            textScale = 1,
         } = uniforms;
         vec3.transformMat3(tmpNormal, normal, normalMatrix); // normal to camera-space-coords
         vec3.normalize(tmpNormal, tmpNormal);
@@ -29,11 +29,11 @@ export default (() => {
 
         vec4.mul(tmpDiffuse, diffuse, getTexture2DFrag(text1, uv[0] * textScale, uv[1] * textScale));
 
-        cel(out.color, cameraPosition, tmpPosition, tmpNormal, lights, specular, tmpDiffuse, shineness, emission, ambient);
+        cel(varyings.color, cameraPosition, tmpPosition, tmpNormal, lights, specular, tmpDiffuse, shineness, emission, ambient);
 
-        out.uv = uv;
+        vec2.copy(varyings.uv, uv);
 
-        vec4.set(out.position, position[0], position[1], position[2], 1);
-        vec4.transformMat4(out.position, out.position, pmvMatrix);
+        vec4.set(varyings.position, position[0], position[1], position[2], 1);
+        vec4.transformMat4(varyings.position, varyings.position, pmvMatrix);
     };
 })();

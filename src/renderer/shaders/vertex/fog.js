@@ -9,15 +9,15 @@ const FOG_FUNC = {
     },
 };
 
-export default (out, attrs, uniforms) => {
+export default (varyings, attrs, uniforms) => {
     const { position, fogColor, fogType = "linear" } = attrs;
 
-    vec4.set(out.position, position[0], position[1], position[2], 1);
+    vec4.set(varyings.position, position[0], position[1], position[2], 1);
 
     const { modelView, projectionMatrix } = uniforms;
-    vec4.transformMat4(out.position, position, modelView);
-    const fogFactor = FOG_FUNC[fogType]?.(attrs, -out.position[2]);
-    vec3.lerp(out.color, fogColor, out.color, Number.isNaN(fogFactor) ? 0 : fogFactor);
+    vec4.transformMat4(varyings.position, position, modelView);
+    const fogFactor = FOG_FUNC[fogType]?.(attrs, -varyings.position[2]);
+    vec3.lerp(varyings.color, fogColor, varyings.color, Number.isNaN(fogFactor) ? 0 : fogFactor);
 
-    vec4.transformMat4(out.position, out.position, projectionMatrix);
+    vec4.transformMat4(varyings.position, varyings.position, projectionMatrix);
 };
